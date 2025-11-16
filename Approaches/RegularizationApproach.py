@@ -1,25 +1,31 @@
 import torch
 import torch.nn as nn
 from Approaches.Approach import Approach
+from torch.utils.data import DataLoader
 class RegularizationApproach(Approach):
     
     def __init__(self, model, criterion=None, device='cpu', lambda_reg=1, alpha=0.5):
         
-        super().__init__(model, criterion)
+        super().__init__(model, criterion, device)
         self.lambda_reg = lambda_reg
         self.alpha = alpha
         self.importance = {}
         self.star_vars = {}
+        self.curr_task = 0
         
         for name, param in self.model.named_parameters():
             if param.requires_grad:
                 self.importance[name] = torch.zeros_like(param.data)
                 self.star_vars[name] = param.data.clone()
     
-    def adapt(self, dataloaders):
-        test_loader = dataloaders["test"]
+    def adapt(self):
+        if self.curr_task >= len(self.streams["test"]):
+            return
+        curr_test_dataset = self.streams["test"][self.curr_task].dataset
+        test_loader = DataLoader(curr_test_dataset, batch_size=64)
         self.estimate_importance(test_loader)
         self.update_star_vars()
+        self.curr_task+=1
     
     def final_loss(self, preds, labels):
          return self.criterion(preds, labels) + self.penalty()

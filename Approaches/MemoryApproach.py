@@ -51,8 +51,12 @@ class MemoryApproach(Approach):
         n_values = len(list(self.memory.values())[self.last_task])
         return n_keys * n_values
     
-    def adapt(self, dataloaders: dict):
-        train_loader = dataloaders["train"]
+    def adapt(self):
+        curr_task = self.last_task+1
+        if curr_task >= len(self.streams["train"]):
+            return
+        curr_train_dataset = self.streams["train"][curr_task].dataset
+        train_loader = DataLoader(curr_train_dataset, batch_size=64)
         self.sample_to_memory(train_loader)
 
             
@@ -61,8 +65,8 @@ class MemoryApproach(Approach):
 
 
 class ER(MemoryApproach):
-    def __init__(self, model, criterion=nn.CrossEntropyLoss(), n_samples=100, max_size=1000, sampling_freq=0.05):
-        super().__init__(model,criterion,n_samples,max_size)
+    def __init__(self, model, criterion=nn.CrossEntropyLoss(), device='cpu', n_samples=100, max_size=1000, sampling_freq=0.05):
+        super().__init__(model, criterion, device, n_samples, max_size)
         self.sampling_freq = sampling_freq
         
     def __call__(self, input, labels=None):
@@ -76,7 +80,7 @@ class ER(MemoryApproach):
             
             batch_size = input.size(0)
             memory_batch = self.get_memory_batch(batch_size=batch_size)
-            x, y = memory_batch[0].cuda(), memory_batch[1].cuda()
+            x, y = memory_batch[0].to(self.device), memory_batch[1].to(self.device)
             input = torch.cat((input,x),dim=0)
             labels = torch.cat((labels,y),dim=0)
 
@@ -85,8 +89,8 @@ class ER(MemoryApproach):
         
 
 class A_GEM(MemoryApproach):
-    def __init__(self, model, criterion=nn.CrossEntropyLoss(), n_samples=100, max_size=1000):
-        super().__init__(model,criterion,n_samples,max_size)
+    def __init__(self, model, criterion=nn.CrossEntropyLoss(), device='cpu', n_samples=100, max_size=1000):
+        super().__init__(model, criterion, device, n_samples, max_size)
 
     def unravel_grads(self):
         grads = [p.grad if p is not None else torch.zeros_like(p) for p in self.model.parameters()]
@@ -106,7 +110,7 @@ class A_GEM(MemoryApproach):
         if self.memory != {}:
             batch_size = input.size(0)
             memory_batch = self.get_memory_batch(batch_size=batch_size)
-            x, y = memory_batch[0].cuda(), memory_batch[1].cuda()
+            x, y = memory_batch[0].to(self.device), memory_batch[1].to(self.device)
 
 
             

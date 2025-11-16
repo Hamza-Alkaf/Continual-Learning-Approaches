@@ -10,12 +10,13 @@ class Approach:
         else:
             self.criterion = criterion
         self.device = device
+        self.streams = {"train": None, "test": None}
 
 
     def final_loss(self, preds, labels):
         return self.criterion(preds, labels)
 
-    def adapt(self, dataloaders: dict):
+    def adapt(self):
         pass
     def __call__(self, input, labels=None):
         if self.model.training:
@@ -29,8 +30,12 @@ class Approach:
             return loss
         return self.model(input)
     
+    def set_stream(self, train_stream, test_stream):
+        self.streams = {"train": train_stream, "test": test_stream}
+    
     def train(self):
         self.model.train()
+
     def eval(self):
         self.model.eval()
     
