@@ -3,6 +3,7 @@ import torch.nn as nn
 from Approaches.Approach import Approach
 from copy import deepcopy
 import torch.nn.functional as F
+
 class LwF(Approach):
     def __init__(self, model, criterion=None, device='cpu', lambda_distill=1):
         super().__init__(model, criterion, device)

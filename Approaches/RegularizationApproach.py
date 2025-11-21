@@ -28,6 +28,7 @@ class RegularizationApproach(Approach):
         self.curr_task+=1
     
     def final_loss(self, preds, labels):
+        
          return self.criterion(preds, labels) + self.penalty()
     
     def estimate_importance(self, dataloader, num_samples=None):
@@ -41,7 +42,7 @@ class RegularizationApproach(Approach):
                 self.star_vars[name] = param.data.clone()
     
     def penalty(self):
-        """Compute MAS regularization penalty"""
+        """Compute regularization penalty"""
 
         penalty_loss = 0
         for name, param in self.model.named_parameters():
@@ -59,7 +60,7 @@ class MAS(RegularizationApproach):
     def __init__(self, model, criterion=None, device='cpu', lambda_reg=1, alpha=0.5):
         super().__init__(model=model, criterion=criterion, device=device, lambda_reg=lambda_reg, alpha=alpha)
     
-    def estimate_importance(self, dataloader, num_samples=None):
+    def estimate_importance(self, dataloader):
         self.model.eval()
         
         temp_importance = {}
@@ -70,8 +71,6 @@ class MAS(RegularizationApproach):
         sample_count = 0
         
         for _, (data, _, _) in enumerate(dataloader):
-            if num_samples and sample_count >= num_samples:
-                break
                 
             data = data.to(self.device)
             
@@ -85,12 +84,13 @@ class MAS(RegularizationApproach):
             
             for name, param in self.model.named_parameters():
                 if param.requires_grad and param.grad is not None:
-                    temp_importance[name] += param.grad.abs() / len(dataloader.dataset)
+                    temp_importance[name] += param.grad.abs() * len(data)
             
             sample_count += len(data)
            
         
         for name in temp_importance:
+            temp_importance[name] = temp_importance[name] / float(sample_count)
             if name in self.importance:
                 self.importance[name] = (
                     self.alpha * temp_importance[name] + 
@@ -111,7 +111,7 @@ class EWC(RegularizationApproach):
         super().__init__(model=model, criterion=criterion, device=device, lambda_reg=lambda_reg, alpha=alpha)
         self.ce = nn.CrossEntropyLoss()
     
-    def estimate_importance(self, dataloader, num_samples=None):
+    def estimate_importance(self, dataloader):
         self.model.eval()
 
         
@@ -123,8 +123,7 @@ class EWC(RegularizationApproach):
         sample_count = 0
         
         for _, (data, labels, _) in enumerate(dataloader):
-            if num_samples and sample_count >= num_samples:
-                break
+            
                 
             data = data.to(self.device)
             labels = labels.to(self.device)
@@ -139,12 +138,13 @@ class EWC(RegularizationApproach):
             
             for name, param in self.model.named_parameters():
                 if param.requires_grad and param.grad is not None:
-                    temp_importance[name] += (param.grad.data.clone() / len(dataloader.dataset)).pow(2)
+                    temp_importance[name] += (param.grad.data.clone()).pow(2) * len(data)
             
             sample_count += len(data)
            
         
         for name in temp_importance:
+            temp_importance[name] = temp_importance[name] / float(sample_count)
             if name in self.importance:
                 self.importance[name] = (
                     self.alpha * temp_importance[name] + 
